@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asah Otak Game</title>
+    <link href="https://unpkg.com/@nextui-org/react" rel="stylesheet">
+    <script src="https://unpkg.com/@nextui-org/react"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f4f8;
+            text-align: center;
+            padding: 20px;
+        }
+        #word-container {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+            text-align: center;
+            margin: 0 5px;
+        }
+        .button {
+            margin: 10px;
+        }
+    </style>
+    <script>
+        let wordData;
+        let totalPoints = 0;
+
+        function startGame() {
+            fetch('start_game.php')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(data);
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                        return;
+                    }
+                    if (!data.kata) {
+                        alert('Kata tidak ditemukan.');
+                        return;
+                    }
+                    wordData = data;
+                    displayWord(data.kata, data.clue);
+                })
+                .catch(error => {
+                    console.error('There was a problem with the fetch operation:', error);
+                    alert('Terjadi kesalahan saat memulai permainan.');
+                });
+        }
+
+        function displayWord(word, clue) {
+            const wordContainer = document.getElementById('word-container');
+            wordContainer.innerHTML = '';
+            for (let i = 0; i < word.length; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.maxLength = 1;
+                input.id = 'letter-' + i;
+                if (i === 2 || i === 6) {
+                    input.value = word[i];
+                    input.disabled = true;
+                }
+                wordContainer.appendChild(input);
+            }
+            document.getElementById('clue').innerText = clue;
+        }
+
+        function checkAnswer() {
+            if (!wordData || !wordData.kata) {
+                alert('Permainan belum dimulai atau terjadi kesalahan. Silakan mulai permainan terlebih dahulu.');
+                return;
+            }
+
+            let answer = '';
+            for (let i = 0; i < wordData.kata.length; i++) {
+                answer += document.getElementById('letter-' + i).value;
+            }
+
+            fetch('check_answer.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ word: wordData.kata, answer: answer })
+            })
+            .then(response => response.json())
+            .then(data => {
+                totalPoints += data.points;
+                alert('Poin yang Anda dapat: ' + data.points);
+            })
+            .catch(error => {
+                console.error('Terjadi kesalahan saat memeriksa jawaban:', error);
+                alert('Terjadi kesalahan saat memeriksa jawaban.');
+            });
+        }
+
+        function saveScore() {
+            const userName = prompt('Masukkan nama Anda:');
+            if (userName) {
+                fetch('save_score.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ user_name: userName, points: totalPoints })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Skor berhasil disimpan');
+                        totalPoints = 0; 
+                        displayScoreboard(data.scoreboard); 
+                    } else {
+                        alert('Gagal menyimpan skor: ' + (data.message || ''));
+                    }
+                })
+                .catch(error => {
+                    console.error('Terjadi kesalahan saat menyimpan skor:', error);
+                    alert('Terjadi kesalahan saat menyimpan skor.');
+                });
+            }
+        }
+
+
+        function displayScoreboard(scoreboard) {
+            const scoreboardContainer = document.createElement('div');
+            scoreboardContainer.innerHTML = '<h2>Scoreboard</h2>';
+            
+            scoreboard.forEach(entry => {
+                const scoreEntry = document.createElement('p');
+                scoreEntry.innerText = `${entry.user_name}: ${entry.points} (Tanggal: ${new Date(entry.created_at).toLocaleString()})`;
+                scoreboardContainer.appendChild(scoreEntry);
+            });
+
+            const existingScoreboard = document.getElementById('scoreboard-container');
+            if (existingScoreboard) {
+                existingScoreboard.remove();
+            }
+            
+            scoreboardContainer.id = 'scoreboard-container'; 
+            document.body.appendChild(scoreboardContainer);
+        }
+
+
+        function resetGame() {
+            wordData = null;
+            document.getElementById('word-container').innerHTML = ''; 
+            document.getElementById('clue').innerText = ''; 
+            totalPoints = 0; 
+            alert('Permainan telah dimulai ulang.');
+        }
+    </script>
+</head>
+<body>
+    <h1>Asah Otak Game</h1>
+    <button class="button" onclick="startGame()">Mulai Permainan</button>
+    <div id="word-container"></div>
+    <p id="clue"></p>
+    <button class="button" onclick="checkAnswer()">Periksa Jawaban</button>
+    <div>
+        <button class="button" onclick="saveScore()">Simpan Skor</button>
+        <button class="button" onclick="resetGame()">Ulangi</button>
+    </div>
+</body>
+</html>
